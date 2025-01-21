@@ -1,6 +1,7 @@
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <cmath> 
-#define M_PI 3.14159265358979323846
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
 
 int main(void)
 {
@@ -20,41 +21,52 @@ int main(void)
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
+    gladLoadGL();
 
-    int n = 9;
-    double r = 1.0;
-    
-    // Array to hold the octagon vertices
-    GLfloat octagonVertices[30];  // 3 values per vertex (x, y, z), plus 1 for the center
 
-    // Add the center vertex (optional, depending on whether you want to center the octagon)
-    octagonVertices[0] = 0.0f;
-    octagonVertices[1] = 0.0f;
-    octagonVertices[2] = 0.0f;
+	std::string path = "3D/bunny.obj";
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string warning, error;
+	tinyobj::attrib_t attributes;
 
-    for (int i = 0; i < n; i++) {
-        // Angle in radians
-        double angle = (i * M_PI / 4);  // 45 degrees in radians
-        GLfloat x = r * cos(angle);  // Calculate x-coordinate
-        GLfloat y = r * sin(angle);  // Calculate y-coordinate
+	bool success = tinyobj::LoadObj(&attributes, &shapes, &materials, &warning, &error, path.c_str());
 
-        // Store the vertex in the array
-        octagonVertices[3 * (i + 1)] = x;
-        octagonVertices[3 * (i + 1) + 1] = y;
-        octagonVertices[3 * (i + 1) + 2] = 0.0f;  // z-coordinate is 0 for 2D
-    }
+	std::vector<GLuint> mesh_indices;
+
+	for (int i = 0; i < shapes[0].mesh.indices.size(); i++)
+	{
+		mesh_indices.push_back(shapes[0].mesh.indices[i].vertex_index);
+	}
+
+
+	GLuint vbo, vao, ebo;
+	glGenVertexArrays(1, &vao);
+	glGenBuffers(1, &vbo);
+	glGenBuffers(1, &ebo);
+
+	glBindVertexArray(vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GL_FLOAT) * attributes.vertices.size(), &attributes.vertices[0], GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)* mesh_indices.size(), mesh_indices.data(), GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
-
         
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(3, GL_FLOAT, 0, octagonVertices);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, n + 1);  
-        glDisableClientState(GL_VERTEX_ARRAY);
+		glBindVertexArray(vao);
+		glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
@@ -62,6 +74,9 @@ int main(void)
         /* Poll for and process events */
         glfwPollEvents();
     }
+	glDeleteVertexArrays(1, &vao);
+	glDeleteBuffers(1, &vbo);
+	glDeleteBuffers(1, &ebo);
 
     glfwTerminate();
     return 0;
